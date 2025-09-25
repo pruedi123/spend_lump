@@ -7,7 +7,7 @@ st.set_page_config(page_title="Spend This — Lump Sum", layout="wide")
 st.title("Spend This — Lump Sum Opportunity Cost")
 
 # ---------- Helpers ----------
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, max_entries=4)
 def load_csv(path: str) -> pd.DataFrame:
     return pd.read_csv(path)
 
@@ -48,21 +48,22 @@ def load_factors(path: str) -> pd.DataFrame:
     return out.reindex(sorted(out.columns, key=_k), axis=1)
 
 def build_windows(df: pd.DataFrame, alloc_col: str, years: int, step: int = 12, fee_mult_per_step: float = 1.0) -> pd.DataFrame:
-    arr = df[alloc_col].values.astype(float)
-    max_start = len(arr) - years * step
-    rows = []
-    if max_start < 0:
-        return pd.DataFrame(columns=["start_index","factors","fv_multiple"])
-    for s in range(0, max_start + 1):
-        idxs = s + np.arange(years) * step
-        if idxs[-1] >= len(arr):
-            break
-        window = arr[idxs]
-        if np.isnan(window).any():
-            continue
-        fv = float(np.prod(window * fee_mult_per_step))
-        rows.append((s, window * fee_mult_per_step, fv))
-    return pd.DataFrame(rows, columns=["start_index","factors","fv_multiple"])
+    """Vectorized window products via log-sum trick for speed.
+    Returns DataFrame with columns: start_index, fv_multiple
+    """
+    arr = df[alloc_col].to_numpy(dtype=float)
+    n = years * step
+    if n <= 0 or len(arr) < n:
+        return pd.DataFrame(columns=["start_index", "fv_multiple"])
+
+    # convert product to sum of logs, then exp back
+    log_arr = np.log(arr * fee_mult_per_step)
+    csum = np.cumsum(log_arr)
+    # window log-sums: csum[i+n] - csum[i]
+    win_log = csum[n:] - csum[:-n]
+    fv = np.exp(win_log)
+    start_idx = np.arange(0, len(arr) - n)
+    return pd.DataFrame({"start_index": start_idx, "fv_multiple": fv})
 
 @st.cache_data(ttl=3600)
 def load_all_data():
@@ -110,8 +111,8 @@ if diff == 0:
     st.info("No opportunity cost yet — increase the 'Thinking of Spending' amount.")
     st.stop()
 
-# Only run the heavy computations when the user clicks Calculate
-if not calc:
+# Only run heavy computations when user clicks Calculate
+if 'calc' in locals() and not calc:
     st.stop()
 
 # ---------- Data ----------

@@ -7,7 +7,7 @@ st.set_page_config(page_title="Spend This — Lump Sum", layout="wide")
 st.title("Spend This — Lump Sum Opportunity Cost")
 
 # ---------- Helpers ----------
-@st.cache_data(ttl=3600)
+@st.cache_data
 def load_csv(path: str) -> pd.DataFrame:
     return pd.read_csv(path)
 
@@ -64,7 +64,7 @@ def build_windows(df: pd.DataFrame, alloc_col: str, years: int, step: int = 12, 
         rows.append((s, window * fee_mult_per_step, fv))
     return pd.DataFrame(rows, columns=["start_index","factors","fv_multiple"])
 
-@st.cache_data(ttl=3600)
+@st.cache_data
 def load_all_data():
     df_glob = load_factors("data/global_factors.csv")
     df_spx  = load_factors("data/spx_factors.csv")
@@ -98,7 +98,6 @@ with st.sidebar:
     thinking = st.number_input("Thinking of Spending ($)", 0, value=15000, step=500)
     whatif   = st.number_input("What if I Spend This Instead ($)", 0, value=5000, step=500)
     st.caption(f"Difference to invest: **${max(0, thinking-whatif):,.0f}**")
-    calc = st.button("Calculate", type="primary")
 
 years_to_retire = retirement_age - current_age
 if years_to_retire <= 0:
@@ -108,10 +107,6 @@ if years_to_retire <= 0:
 diff = max(0, thinking - whatif)
 if diff == 0:
     st.info("No opportunity cost yet — increase the 'Thinking of Spending' amount.")
-    st.stop()
-
-# Only run the heavy computations when the user clicks Calculate
-if not calc:
     st.stop()
 
 # ---------- Data ----------
