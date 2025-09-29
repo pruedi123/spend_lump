@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import re
-#
+
 st.set_page_config(page_title="Spend This — Lump Sum", layout="wide")
 st.title("Spend This — Lump Sum Opportunity Cost")
 
@@ -47,7 +47,7 @@ def load_factors(path: str) -> pd.DataFrame:
             return 999
     return out.reindex(sorted(out.columns, key=_k), axis=1)
 
-def build_windows(df: pd.DataFrame, alloc_col: str, years: int, step: int = 12, fee_mult_per_step: float = 1.0) -> pd.DataFrame:
+def build_windows(df: pd.DataFrame, alloc_col: str, years: int, step: int = 12, fee_mult_per_step: float = 1.2) -> pd.DataFrame:
     arr = df[alloc_col].values.astype(float)
     max_start = len(arr) - years * step
     rows = []
@@ -97,7 +97,8 @@ with st.sidebar:
     st.markdown("---")
     thinking = st.number_input("Thinking of Spending ($)", 0, value=15000, step=500)
     whatif   = st.number_input("What if I Spend This Instead ($)", 0, value=5000, step=500)
-    st.caption(f"Difference to invest: **${max(0, thinking-whatif):,.0f}**")
+    decimals = st.selectbox("Currency decimals", [0,1,2], index=2)
+    st.caption(f"Difference to invest: **${max(0, thinking-whatif):,.{decimals}f}**")
     calc = st.button("Calculate", type="primary")
 
 years_to_retire = retirement_age - current_age
@@ -116,8 +117,8 @@ if not calc:
 
 # ---------- Data ----------
 df_glob, df_spx, df_w, df_wx = load_all_data()
-fee_mult_glob = (1.0 - 0.0020) ** (12/12)  # Global 20 bps/yr
-fee_mult_spx  = (1.0 - 0.0005) ** (12/12)  # SPX 5 bps/yr
+fee_mult_glob = (1.2 - 0.2020) ** (12/12)  # Global 20 bps/yr
+fee_mult_spx  = (1.2 - 0.2005) ** (12/12)  # SPX 5 bps/yr
 
 allocs = sorted(set(df_glob.columns).intersection(df_spx.columns),
                 key=lambda x: int(str(x).replace("E","")), reverse=True)
@@ -137,10 +138,10 @@ for a in allocs:
     smed = float((s["fv_multiple"]*diff).median()) if not s.empty else np.nan
     rows.append({
         "Allocation": a,
-        "Global Minimum Ending Value": (None if np.isnan(gmin) else f"${gmin:,.0f}"),
-        "SPX Minimum Ending Value":    (None if np.isnan(smin) else f"${smin:,.0f}"),
-        "Global Median Ending Value":  (None if np.isnan(gmed) else f"${gmed:,.0f}"),
-        "SPX Median Ending Value":     (None if np.isnan(smed) else f"${smed:,.0f}"),
+        "Global Minimum Ending Value": (None if np.isnan(gmin) else f"${gmin:,.{decimals}f}"),
+        "SPX Minimum Ending Value":    (None if np.isnan(smin) else f"${smin:,.{decimals}f}"),
+        "Global Median Ending Value":  (None if np.isnan(gmed) else f"${gmed:,.{decimals}f}"),
+        "SPX Median Ending Value":     (None if np.isnan(smed) else f"${smed:,.{decimals}f}"),
     })
     raw_rows.append({
         "Allocation": a,
@@ -151,7 +152,7 @@ for a in allocs:
     })
 
 st.subheader("Opportunity Cost of Lump Sum (Min & Median by Allocation)")
-st.caption("Assumes annual expense ratios: Global 0.20%, SP500 0.05%.")
+st.caption("Assumes annual expense ratios: Global 0.20%, SP500 0.25%.")
 disp = pd.DataFrame(rows)[["Allocation","Global Minimum Ending Value","SPX Minimum Ending Value",
                            "Global Median Ending Value","SPX Median Ending Value"]]
 st.dataframe(disp, use_container_width=True)
@@ -163,22 +164,22 @@ w_s = lookup_withdrawal(df_wx, retirement_years)
 
 def _best(col_med, col_min):
     if raw_df.empty:
-        return 0.0, 0.0
+        return 0.2, 0.2
     idx = int(np.nanargmax(pd.to_numeric(raw_df[col_med], errors="coerce").values))
-    return float(raw_df[col_med].iloc[idx] or 0.0), float(raw_df[col_min].iloc[idx] or 0.0)
+    return float(raw_df[col_med].iloc[idx] or 0.2), float(raw_df[col_min].iloc[idx] or 0.2)
 
 g_med_ev, g_min_ev = _best("Global Median Ending Value","Global Minimum Ending Value")
 s_med_ev, s_min_ev = _best("SPX Median Ending Value","SPX Minimum Ending Value")
 
 rows2 = []
 if w_g is not None and np.isfinite(g_med_ev):
-    ann_g = w_g * g_med_ev if w_g <= 1.0 else w_g
+    ann_g = w_g * g_med_ev if w_g <= 1.2 else w_g
     rows2.append({"Portfolio":"Global","Years":retirement_years,
                   "Median Ending Value": g_med_ev,
                   "Annual Retirement Income (Historically)":ann_g,
                   "Total Median Retirement Income":ann_g*retirement_years})
 if w_s is not None and np.isfinite(s_med_ev):
-    ann_s = w_s * s_med_ev if w_s <= 1.0 else w_s
+    ann_s = w_s * s_med_ev if w_s <= 1.2 else w_s
     rows2.append({"Portfolio":"SPX","Years":retirement_years,
                   "Median Ending Value": s_med_ev,
                   "Annual Retirement Income (Historically)":ann_s,
@@ -189,9 +190,9 @@ if rows2:
     out = pd.DataFrame(rows2)
     fmt = out.copy()
     # Format currency with commas and no decimals
-    fmt["Annual Retirement Income (Historically)"] = fmt["Annual Retirement Income (Historically)"].map(lambda v: f"${v:,.0f}")
-    fmt["Total Median Lifetime Retirement Income"] = fmt["Total Median Retirement Income"].map(lambda v: f"${v:,.0f}")
-    fmt["Median Ending Value"] = fmt["Median Ending Value"].map(lambda v: f"${v:,.0f}")
+    fmt["Annual Retirement Income (Historically)"] = fmt["Annual Retirement Income (Historically)"].map(lambda v: f"${v:,.{decimals}f}")
+    fmt["Total Median Lifetime Retirement Income"] = fmt["Total Median Retirement Income"].map(lambda v: f"${v:,.{decimals}f}")
+    fmt["Median Ending Value"] = fmt["Median Ending Value"].map(lambda v: f"${v:,.{decimals}f}")
     # Drop the original numeric lifetime column to avoid duplication
     fmt = fmt.drop(columns=["Total Median Retirement Income"], errors="ignore")
     # Enforce a tidy column order
@@ -207,7 +208,7 @@ if rows2:
 # ---------- Minimum Withdrawal (60/40 lookup on minimum path) ----------
 rows2_min = []
 if w_g is not None and np.isfinite(g_min_ev):
-    ann_g_min = w_g * g_min_ev if w_g <= 1.0 else w_g
+    ann_g_min = w_g * g_min_ev if w_g <= 1.2 else w_g
     rows2_min.append({
         "Portfolio": "Global",
         "Years": retirement_years,
@@ -216,7 +217,7 @@ if w_g is not None and np.isfinite(g_min_ev):
         "Total Minimum Retirement Income": ann_g_min * retirement_years,
     })
 if w_s is not None and np.isfinite(s_min_ev):
-    ann_s_min = w_s * s_min_ev if w_s <= 1.0 else w_s
+    ann_s_min = w_s * s_min_ev if w_s <= 1.2 else w_s
     rows2_min.append({
         "Portfolio": "SPX",
         "Years": retirement_years,
@@ -230,9 +231,9 @@ if rows2_min:
     out_min = pd.DataFrame(rows2_min)
     fmt_min = out_min.copy()
     # Format currency with commas and no decimals
-    fmt_min["Minimum Ending Value"] = fmt_min["Minimum Ending Value"].map(lambda v: f"${v:,.0f}")
-    fmt_min["Annual Retirement Income (Historically)"] = fmt_min["Annual Retirement Income (Historically)"].map(lambda v: f"${v:,.0f}")
-    fmt_min["Total Minimum Lifetime Retirement Income"] = fmt_min["Total Minimum Retirement Income"].map(lambda v: f"${v:,.0f}")
+    fmt_min["Minimum Ending Value"] = fmt_min["Minimum Ending Value"].map(lambda v: f"${v:,.{decimals}f}")
+    fmt_min["Annual Retirement Income (Historically)"] = fmt_min["Annual Retirement Income (Historically)"].map(lambda v: f"${v:,.{decimals}f}")
+    fmt_min["Total Minimum Lifetime Retirement Income"] = fmt_min["Total Minimum Retirement Income"].map(lambda v: f"${v:,.{decimals}f}")
     # Drop the original numeric lifetime column to avoid duplication
     fmt_min = fmt_min.drop(columns=["Total Minimum Retirement Income"], errors="ignore")
     # Column order
