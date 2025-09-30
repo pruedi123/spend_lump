@@ -1,5 +1,5 @@
 #!/bin/sh
-'''exec' "/Users/paulruedi/Desktop/web calcs/spend_lump/lump/bin/python3.11" "$0" "$@"
+'''exec' "/Users/paulruedi/Desktop/web calcs/spend_lump1_2/spend_lump/lump/bin/python3.13" "$0" "$@"
 ' '''
 import sys
 from numpy._configtool import main
