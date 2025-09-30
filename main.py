@@ -5,7 +5,7 @@ import re
 
 st.set_page_config(page_title="Spend This — Lump Sum", layout="wide")
 st.title("Spend This — Lump Sum Opportunity Cost")
-
+st.caption("Estimate the opportunity cost of spending a lump sum today instead of investing it until retirement.")
 # ---------- Helpers ----------
 @st.cache_data(ttl=3600)
 def load_csv(path: str) -> pd.DataFrame:
