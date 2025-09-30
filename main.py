@@ -5,7 +5,7 @@ import re
 
 st.set_page_config(page_title="Spend This — Lump Sum", layout="wide")
 st.title("Spend This — Lump Sum Opportunity Cost")
-#
+
 # ---------- Helpers ----------
 @st.cache_data(ttl=3600)
 def load_csv(path: str) -> pd.DataFrame:
